@@ -3,9 +3,11 @@ import 'dart:typed_data';
 import 'package:quiver/collection.dart' as collections;
 import 'package:quiver/core.dart';
 
+import '../../epub_parser.dart';
 import 'epub_chapter.dart';
 import 'epub_content.dart';
 import 'epub_schema.dart';
+import 'epub_toc.dart';
 
 class EpubBook {
   String? Title;
@@ -15,6 +17,9 @@ class EpubBook {
   EpubContent? Content;
   Uint8List? CoverImage;
   List<EpubChapter>? Chapters;
+  Map<String, int>? PageToChapterMap;
+  TableOfContents? Toc;
+  EpubBookRef? ref;
 
   @override
   int get hashCode {

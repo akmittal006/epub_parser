@@ -41,7 +41,7 @@ class BookCoverReader {
     coverImageContentFileRef = bookRef.Content!.Images![coverManifestItem.Href];
     var coverImageContent =
         await coverImageContentFileRef!.readContentAsBytes();
-    var retval = images.decodeImage(coverImageContent);
+    var retval = images.decodeImage(Uint8List.fromList(coverImageContent));
     return retval;
   }
 
@@ -62,15 +62,14 @@ class BookCoverReader {
         .firstWhereOrNull((EpubManifestItem manifestItem) =>
             manifestItem.Id!.toLowerCase() ==
             coverMetaItem.Content!.toLowerCase());
-    if (coverManifestItem == null) {
-      throw Exception(
-          'Incorrect EPUB manifest: item with ID = \"${coverMetaItem.Content}\" is missing.');
-    }
+    // if (coverManifestItem == null) {
+    //   throw Exception(
+    //       'Incorrect EPUB manifest: item with ID = \"${coverMetaItem.Content}\" is missing.');
+    // }
 
     EpubByteContentFileRef? coverImageContentFileRef;
-    if (!bookRef.Content!.Images!.containsKey(coverManifestItem.Href)) {
-      throw Exception(
-          'Incorrect EPUB manifest: item with href = \"${coverManifestItem.Href}\" is missing.');
+    if (coverManifestItem == null || !bookRef.Content!.Images!.containsKey(coverManifestItem.Href)) {
+      return Uint8List.fromList([]);
     }
 
     coverImageContentFileRef = bookRef.Content!.Images![coverManifestItem.Href];

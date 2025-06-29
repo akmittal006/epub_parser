@@ -1,5 +1,6 @@
 import 'package:quiver/collection.dart' as collections;
 import 'package:quiver/core.dart';
+import 'package:html/dom.dart' as dom;
 
 class EpubChapter {
   String? Title;
@@ -7,6 +8,7 @@ class EpubChapter {
   String? Anchor;
   String? HtmlContent;
   List<EpubChapter>? SubChapters;
+  List<dom.Element> Paragraphs = [];
 
   @override
   int get hashCode {

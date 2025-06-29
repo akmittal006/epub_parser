@@ -1,6 +1,10 @@
 import 'dart:async';
 
 import 'package:archive/archive.dart';
+import 'package:epub_parser/src/entities/epub_toc.dart';
+import 'package:epub_parser/src/schema/navigation/epub_navigation_point.dart';
+import 'package:html/dom.dart' as dom;
+import 'package:html/parser.dart';
 
 import 'entities/epub_book.dart';
 import 'entities/epub_byte_content_file.dart';
@@ -91,7 +95,9 @@ class EpubReader {
     result.CoverImage = await epubBookRef.readCoverAsUint8List();
     var chapterRefs = await epubBookRef.getChapters();
     result.Chapters = await readChapters(chapterRefs);
-
+    result.PageToChapterMap = mapPagesToChapter(result.Chapters);
+    result.Toc = readToC(result);
+    result.ref = epubBookRef;
     return result;
   }
 
@@ -169,14 +175,118 @@ class EpubReader {
     var result = <EpubChapter>[];
     await Future.forEach(chapterRefs, (EpubChapterRef chapterRef) async {
       var chapter = EpubChapter();
-
-      chapter.Title = chapterRef.Title;
       chapter.ContentFileName = chapterRef.ContentFileName;
       chapter.Anchor = chapterRef.Anchor;
       chapter.HtmlContent = await chapterRef.readHtmlContent();
-      chapter.SubChapters = await readChapters(chapterRef.SubChapters!);
+
+      var doc = chapter.HtmlContent == null ? dom.Document() : parse(chapter.HtmlContent);
+      chapter.Title = chapterRef.Title;
+      for (var node in doc.head?.children ?? []) {
+        if (node != null && node.localName == 'title') {
+          print("TITLE: " + node.localName);
+          chapter.Title = node.text;
+          break;
+        }
+      }
+      chapter.Paragraphs = parseParagraphsFromDoc(doc);
+      print('New EPUB_PARSER:  ${chapterRef.SubChapters!.length} for chap: ' +
+          chapterRef.ContentFileName!);
+      print('PARA LENGTH start:  ${chapter.Paragraphs.length} for chap: ' +
+          chapterRef.ContentFileName!);
+      // chapter.SubChapters = await readChapters(chapterRef.SubChapters!);
+      // chapter.SubChapters?.forEach((subChapter) {
+      //   chapter.Paragraphs.addAll(subChapter.Paragraphs);
+      // });
+      // await appendParagraphs(chapter);
+      print('PARA LENGTH end :  ${chapter.Paragraphs.length} for chap: ' +
+          chapterRef.ContentFileName!);
 
       result.add(chapter);
+    });
+    return result;
+  }
+
+  static List<dom.Element> _removeAllDiv(List<dom.Element> elements) {
+    final result = <dom.Element>[];
+
+    for (final node  in elements) {
+      // var node = rawNode as dom.Element;
+      if ((node.localName == 'div' || node.localName == 'section' || node.localName == 'article') &&
+          node.children.isNotEmpty) {
+        result.addAll(_removeAllDiv(node.children));
+      } else {
+        result.add(node);
+      }
+    }
+
+    return result;
+  }
+
+  static List<dom.Element> parseParagraphsFromDoc(dom.Document doc) {
+    if (doc.getElementsByTagName('body').isEmpty) return [];
+    try {
+      // var doc = parse(htmlContent);
+      return _removeAllDiv(doc.getElementsByTagName('body').first.children);
+    } on Exception catch (_, e) {}
+    return [];
+  }
+
+  static List<dom.Element> parseParagraphs(String? htmlContent) {
+    if (htmlContent == null) return [];
+    try {
+      var doc = parse(htmlContent);
+      return _removeAllDiv(doc.getElementsByTagName('body').first.children);
+    } on Exception catch (_, e) {}
+    return [];
+  }
+
+  static Future<void> appendParagraphs(EpubChapter chapter) async {
+    await Future.forEach(chapter.SubChapters as Iterable<EpubChapter>,
+        (EpubChapter subChapter) async {
+      var chapter = EpubChapter();
+      chapter.Paragraphs.addAll(subChapter.Paragraphs);
+    });
+  }
+
+  static Map<String, int>? mapPagesToChapter(List<EpubChapter>? chapters) {
+    if (chapters == null) return null;
+    var map = <String, int>{};
+    for (var i = 0; i < chapters.length; i++) {
+      var epubChapter = chapters[i];
+      map[epubChapter.ContentFileName!] = i;
+    }
+    return map;
+  }
+
+  static TableOfContents? readToC(EpubBook book) {
+    if (book.Chapters == null) return null;
+    var toc = TableOfContents();
+    toc.toc = traverseNavMap(book, book.Schema!.Navigation!.NavMap!.Points, '');
+    return toc;
+  }
+
+  static List<ToCItem> traverseNavMap(
+      EpubBook book, List<EpubNavigationPoint>? points, String prefix) {
+    var result = <ToCItem>[];
+    if (points == null) return result;
+    points.forEach((point) {
+      if (point.NavigationLabels == null) {
+      } else {
+        point.NavigationLabels?.forEach((label) {
+          var item = ToCItem();
+          if (book.PageToChapterMap!.containsKey(point.Content!.Source!.split('#')[0])) {
+            item.chapterIndex =
+            book.PageToChapterMap![point.Content!.Source!.split('#')[0]]!;
+            item.label = prefix + label.Text!;
+            result.add(item);
+          }
+
+
+          var items =
+              traverseNavMap(book, point.ChildNavigationPoints, prefix + '  ');
+          result.addAll(items as Iterable<ToCItem>);
+        });
+      }
     });
     return result;
   }

@@ -49,6 +49,8 @@ class NavigationReader {
             'EPUB parsing error: TOC item $tocId not found in EPUB manifest.');
       }
 
+      // get path of toc file
+      // _tocFileEntryPath = tocManifestItem.Href;
       _tocFileEntryPath =
           ZipPathUtils.combine(contentDirectoryPath, tocManifestItem.Href);
       var tocFileEntry = epubArchive.files.cast<ArchiveFile?>().firstWhere(
@@ -145,6 +147,7 @@ class NavigationReader {
             'EPUB parsing error: TOC item, not found in EPUB manifest.');
       }
 
+      // _tocFileEntryPath = tocManifestItem.Href;
       _tocFileEntryPath =
           ZipPathUtils.combine(contentDirectoryPath, tocManifestItem.Href);
       var tocFileEntry = epubArchive.files.cast<ArchiveFile?>().firstWhere(
@@ -156,6 +159,7 @@ class NavigationReader {
             'EPUB parsing error: TOC file $_tocFileEntryPath not found in archive.');
       }
       //Get relative toc file path
+      print("[EPUB v3 DEBUG] Toc file path: $_tocFileEntryPath");
       final _tocFileEntryPaths = _tocFileEntryPath!.split('/');
       if (_tocFileEntryPaths.length > 1) {
         _tocFileEntryPath = ((_tocFileEntryPath!.split('/')..removeLast())
@@ -165,6 +169,8 @@ class NavigationReader {
       } else {
         _tocFileEntryPath = '/';
       }
+
+      print("[EPUB v3 DEBUG] Toc file path: $_tocFileEntryPath");
 
       var containerDocument =
           xml.XmlDocument.parse(convert.utf8.decode(tocFileEntry.content));

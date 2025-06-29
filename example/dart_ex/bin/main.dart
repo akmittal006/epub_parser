@@ -1,11 +1,12 @@
 import 'dart:io' as io;
 
 import 'package:path/path.dart' as path;
-import 'package:epub_parser/epubx.dart';
+import 'package:epub_parser/epub_parser.dart';
+// import 'package:epub_parser/epubx.dart';
 
 main(List<String> args) async {
   //Get the epub into memory somehow
-  String fileName = "alicesAdventuresUnderGround.epub";
+  String fileName = "bin/Crouch, Blake - Dark Matter 2.epub";
   // String fileName = "effectivekotlin.epub";
   String fullPath = path.join(io.Directory.current.path, fileName);
   var targetFile = new io.File(fullPath);
@@ -30,7 +31,7 @@ main(List<String> args) async {
 
 // Book's cover image (null if there is no cover)
   var coverImage = epubBook.CoverImage;
-  print('Cover image: ${coverImage != null}\n$coverImage');
+  print('Cover image: ${coverImage != null}\n');
 
 // CHAPTERS
 
@@ -38,6 +39,7 @@ main(List<String> args) async {
   epubBook.Chapters!.forEach((EpubChapter chapter) {
     // Title of chapter
     String chapterTitle = chapter.Title!;
+    print('Chapter title: $chapterTitle');
 
     // HTML content of current chapter
     String chapterHtmlContent = chapter.HtmlContent!;
