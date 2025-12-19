@@ -12,6 +12,10 @@ class ChapterReader {
     if (bookRef.Schema!.Navigation == null) {
       return <EpubChapterRef>[];
     }
+
+    return getChaptersImplBySpine(
+        bookRef, bookRef.Schema!.Package!.Spine!.Items!);
+
     if (bookRef.Schema!.Package!.Version == EpubVersion.Epub2) {
       // bookRef.Schema!.Package!.
       return getChaptersImplBySpine(

@@ -269,6 +269,7 @@ class EpubReader {
       EpubBook book, List<EpubNavigationPoint>? points, String prefix) {
     var result = <ToCItem>[];
     if (points == null) return result;
+
     points.forEach((point) {
       if (point.NavigationLabels == null) {
       } else {

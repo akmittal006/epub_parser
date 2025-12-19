@@ -32,7 +32,7 @@ class NavigationReader {
   static Future<EpubNavigation> readNavigation(Archive epubArchive,
       String contentDirectoryPath, EpubPackage package) async {
     var result = EpubNavigation();
-    if (package.Version == EpubVersion.Epub2) {
+    if (package.Version == EpubVersion.Epub2 || package.Version == EpubVersion.Epub3) {
       var tocId = package.Spine!.TableOfContents;
       if (tocId == null || tocId.isEmpty) {
         throw Exception('EPUB parsing error: TOC ID is empty.');
