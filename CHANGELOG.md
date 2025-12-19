@@ -1,3 +1,10 @@
+## 3.1.0
+### Added
+- Improved EPUB3 navigation support
+### Changed
+- Use spine-based chapter reading for all EPUB versions
+- Extend navigation reader to handle EPUB3 table of contents
+
 ## 3.0.1
 ### Fixed
 - Some epubs are not able to read or open.
