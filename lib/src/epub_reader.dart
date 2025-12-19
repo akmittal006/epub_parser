@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:archive/archive.dart';
-import 'package:epub_parser/src/entities/epub_toc.dart';
-import 'package:epub_parser/src/schema/navigation/epub_navigation_point.dart';
+import 'package:am_epub_parser/src/entities/epub_toc.dart';
+import 'package:am_epub_parser/src/schema/navigation/epub_navigation_point.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart';
 

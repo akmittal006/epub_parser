@@ -7,5 +7,5 @@ environment:
 
 dependencies:
   # Epub
-  epub_parser:
+  am_epub_parser:
     path: ../../

@@ -1,4 +1,4 @@
-import 'package:epub_parser/src/schema/opf/epub_spine.dart';
+import 'package:am_epub_parser/src/schema/opf/epub_spine.dart';
 import 'package:xml/src/xml/builder.dart' show XmlBuilder;
 
 class EpubSpineWriter {

@@ -1,5 +1,5 @@
-import 'package:epub_parser/src/schema/opf/epub_manifest_item.dart';
-import 'package:epub_parser/src/schema/opf/epub_version.dart';
+import 'package:am_epub_parser/src/schema/opf/epub_manifest_item.dart';
+import 'package:am_epub_parser/src/schema/opf/epub_version.dart';
 
 import '../ref_entities/epub_book_ref.dart';
 import '../ref_entities/epub_chapter_ref.dart';

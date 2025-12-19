@@ -10,7 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   # Epub
-  epub_parser:
+  am_epub_parser:
     path: ../../
   # To get the epub from the internet
   http:  ^0.13.4
