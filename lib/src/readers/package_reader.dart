@@ -135,7 +135,7 @@ class PackageReader {
     metadataNode.children
         .whereType<XmlElement>()
         .forEach((XmlElement metadataItemNode) {
-      var innerText = metadataItemNode.value ?? '';
+      var innerText = metadataItemNode.innerText;
       switch (metadataItemNode.name.local.toLowerCase()) {
         case 'title':
           result.Titles!.add(innerText);
@@ -215,7 +215,7 @@ class PackageReader {
           break;
       }
     });
-    result.Contributor = metadataContributorNode.value;
+    result.Contributor = metadataContributorNode.innerText;
     return result;
   }
 
@@ -234,7 +234,7 @@ class PackageReader {
           break;
       }
     });
-    result.Creator = metadataCreatorNode.value;
+    result.Creator = metadataCreatorNode.innerText;
     return result;
   }
 
@@ -245,7 +245,7 @@ class PackageReader {
     if (eventAttribute != null && eventAttribute.isNotEmpty) {
       result.Event = eventAttribute;
     }
-    result.Date = metadataDateNode.value;
+    result.Date = metadataDateNode.innerText;
     return result;
   }
 
@@ -264,7 +264,7 @@ class PackageReader {
           break;
       }
     });
-    result.Identifier = metadataIdentifierNode.value;
+    result.Identifier = metadataIdentifierNode.innerText;
     return result;
   }
 
@@ -318,7 +318,7 @@ class PackageReader {
     });
     // TODO add condition to not override content if it is already set
     if (result.Content == null || result.Content!.isEmpty) {
-      result.Content = metadataMetaNode.value;
+      result.Content = metadataMetaNode.innerText;
     }
     return result;
   }

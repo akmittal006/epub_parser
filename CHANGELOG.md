@@ -1,3 +1,8 @@
+## 3.1.2
+### Fixed
+- Fix XML text extraction using `.innerText` instead of `.value` for element nodes
+- Restores correct parsing of book titles, authors, descriptions, and navigation labels
+
 ## 3.1.1
 ### Fixed
 - Resolve all flutter analyze issues

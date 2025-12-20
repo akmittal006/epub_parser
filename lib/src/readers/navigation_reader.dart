@@ -279,7 +279,7 @@ class NavigationReader {
         .whereType<xml.XmlElement>()
         .forEach((xml.XmlElement textNode) {
       if (textNode.name.local.toLowerCase() == 'text') {
-        result.Authors!.add(textNode.value ?? '');
+        result.Authors!.add(textNode.innerText);
       }
     });
     return result;
@@ -293,7 +293,7 @@ class NavigationReader {
         .whereType<xml.XmlElement>()
         .forEach((xml.XmlElement textNode) {
       if (textNode.name.local.toLowerCase() == 'text') {
-        result.Titles!.add(textNode.value ?? '');
+        result.Titles!.add(textNode.innerText);
       }
     });
     return result;
@@ -350,7 +350,7 @@ class NavigationReader {
           'Incorrect EPUB navigation label: label text element is missing.');
     }
 
-    result.Text = navigationLabelTextNode.value;
+    result.Text = navigationLabelTextNode.innerText;
 
     return result;
   }
@@ -358,7 +358,7 @@ class NavigationReader {
   static EpubNavigationLabel readNavigationLabelV3(
       xml.XmlElement navigationLabelNode) {
     var result = EpubNavigationLabel();
-    result.Text = (navigationLabelNode.value ?? '').trim();
+    result.Text = navigationLabelNode.innerText.trim();
     return result;
   }
 
