@@ -1,3 +1,11 @@
+## 3.1.1
+### Fixed
+- Resolve all flutter analyze issues
+- Fix broken import in epub_book.dart
+- Remove deprecated .text usage in favor of .value for XML parsing
+- Remove dead code and unused imports
+- Fix style issues (single quotes, curly braces, type annotations)
+
 ## 3.1.0
 ### Added
 - Improved EPUB3 navigation support
