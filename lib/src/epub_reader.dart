@@ -183,7 +183,7 @@ class EpubReader {
       chapter.Title = chapterRef.Title;
       for (var node in doc.head?.children ?? []) {
         if (node != null && node.localName == 'title') {
-          print("TITLE: " + node.localName);
+          print('TITLE: ' + node.localName);
           chapter.Title = node.text;
           break;
         }
@@ -227,7 +227,7 @@ class EpubReader {
     try {
       // var doc = parse(htmlContent);
       return _removeAllDiv(doc.getElementsByTagName('body').first.children);
-    } on Exception catch (_, e) {}
+    } on Exception catch (_) {}
     return [];
   }
 
@@ -236,7 +236,7 @@ class EpubReader {
     try {
       var doc = parse(htmlContent);
       return _removeAllDiv(doc.getElementsByTagName('body').first.children);
-    } on Exception catch (_, e) {}
+    } on Exception catch (_) {}
     return [];
   }
 

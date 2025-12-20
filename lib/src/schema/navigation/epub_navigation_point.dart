@@ -37,7 +37,9 @@ class EpubNavigationPoint {
     }
 
     if (!collections.listsEqual(
-        ChildNavigationPoints, otherAs.ChildNavigationPoints)) return false;
+        ChildNavigationPoints, otherAs.ChildNavigationPoints)) {
+      return false;
+    }
 
     return Id == otherAs.Id &&
         Class == otherAs.Class &&

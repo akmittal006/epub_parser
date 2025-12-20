@@ -1,6 +1,3 @@
-import 'package:am_epub_parser/src/schema/opf/epub_manifest_item.dart';
-import 'package:am_epub_parser/src/schema/opf/epub_version.dart';
-
 import '../ref_entities/epub_book_ref.dart';
 import '../ref_entities/epub_chapter_ref.dart';
 import '../ref_entities/epub_text_content_file_ref.dart';
@@ -15,22 +12,13 @@ class ChapterReader {
 
     return getChaptersImplBySpine(
         bookRef, bookRef.Schema!.Package!.Spine!.Items!);
-
-    if (bookRef.Schema!.Package!.Version == EpubVersion.Epub2) {
-      // bookRef.Schema!.Package!.
-      return getChaptersImplBySpine(
-          bookRef, bookRef.Schema!.Package!.Spine!.Items!);
-    } else {
-      return getChaptersImpl(
-          bookRef, bookRef.Schema!.Navigation!.NavMap!.Points!);
-    }
   }
 
   static List<EpubChapterRef> getChaptersImpl(
       EpubBookRef bookRef, List<EpubNavigationPoint> navigationPoints) {
     var result = <EpubChapterRef>[];
     for (var key in bookRef.Content!.Html!.keys) {
-      print("[EPUB V3 DEBUG]" + key);
+      print('[EPUB V3 DEBUG]' + key);
     }
     navigationPoints.forEach((EpubNavigationPoint navigationPoint) {
       String? contentFileName;
@@ -50,7 +38,7 @@ class ChapterReader {
       EpubTextContentFileRef? htmlContentFileRef;
 
       //print all bookRef.Content!.Html! keys
-      print("[EPUB V3 DEBUG] $contentFileName");
+      print('[EPUB V3 DEBUG] $contentFileName');
 
       // for (var key in bookRef.Content!.Html!.keys) {
         if (bookRef.Content!.Html!.containsKey(contentFileName)) {
@@ -84,14 +72,14 @@ class ChapterReader {
       EpubTextContentFileRef? htmlContentFileRef;
       if (!bookRef.Content!.Html!.containsKey(contentFileName)) {
         throw Exception(
-            'Incorrect EPUB manifest: item with href = \"$contentFileName\" is missing.');
+            'Incorrect EPUB manifest: item with href = "$contentFileName" is missing.');
       }
 
       htmlContentFileRef = bookRef.Content!.Html![contentFileName];
       var chapterRef = EpubChapterRef(htmlContentFileRef);
       chapterRef.ContentFileName = contentFileName;
       chapterRef.Anchor = anchor;
-      chapterRef.Title = "chap title";
+      chapterRef.Title = 'chap title';
       chapterRef.SubChapters = [];
       // chapterRef.Title = spineItemRef.NavigationLabels!.first.Text;
       // chapterRef.SubChapters =

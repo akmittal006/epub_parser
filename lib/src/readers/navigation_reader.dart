@@ -159,7 +159,7 @@ class NavigationReader {
             'EPUB parsing error: TOC file $_tocFileEntryPath not found in archive.');
       }
       //Get relative toc file path
-      print("[EPUB v3 DEBUG] Toc file path: $_tocFileEntryPath");
+      print('[EPUB v3 DEBUG] Toc file path: $_tocFileEntryPath');
       final _tocFileEntryPaths = _tocFileEntryPath!.split('/');
       if (_tocFileEntryPaths.length > 1) {
         _tocFileEntryPath = ((_tocFileEntryPath!.split('/')..removeLast())
@@ -170,7 +170,7 @@ class NavigationReader {
         _tocFileEntryPath = '/';
       }
 
-      print("[EPUB v3 DEBUG] Toc file path: $_tocFileEntryPath");
+      print('[EPUB v3 DEBUG] Toc file path: $_tocFileEntryPath');
 
       var containerDocument =
           xml.XmlDocument.parse(convert.utf8.decode(tocFileEntry.content));
@@ -279,7 +279,7 @@ class NavigationReader {
         .whereType<xml.XmlElement>()
         .forEach((xml.XmlElement textNode) {
       if (textNode.name.local.toLowerCase() == 'text') {
-        result.Authors!.add(textNode.text);
+        result.Authors!.add(textNode.value ?? '');
       }
     });
     return result;
@@ -293,7 +293,7 @@ class NavigationReader {
         .whereType<xml.XmlElement>()
         .forEach((xml.XmlElement textNode) {
       if (textNode.name.local.toLowerCase() == 'text') {
-        result.Titles!.add(textNode.text);
+        result.Titles!.add(textNode.value ?? '');
       }
     });
     return result;
@@ -350,7 +350,7 @@ class NavigationReader {
           'Incorrect EPUB navigation label: label text element is missing.');
     }
 
-    result.Text = navigationLabelTextNode.text;
+    result.Text = navigationLabelTextNode.value;
 
     return result;
   }
@@ -358,7 +358,7 @@ class NavigationReader {
   static EpubNavigationLabel readNavigationLabelV3(
       xml.XmlElement navigationLabelNode) {
     var result = EpubNavigationLabel();
-    result.Text = navigationLabelNode.text.trim();
+    result.Text = (navigationLabelNode.value ?? '').trim();
     return result;
   }
 

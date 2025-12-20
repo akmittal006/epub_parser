@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:quiver/collection.dart' as collections;
 import 'package:quiver/core.dart';
 
-import '../../epub_parser.dart';
+import '../ref_entities/epub_book_ref.dart';
 import 'epub_chapter.dart';
 import 'epub_content.dart';
 import 'epub_schema.dart';

@@ -15,7 +15,7 @@ class EpubWriter {
   static Archive _createArchive(EpubBook book) {
     var arch = Archive();
 
-    final StringBuffer buffer = StringBuffer(
+    final buffer = StringBuffer(
         '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path=')
       ..write('"')
       ..write(book.Schema?.ContentDirectoryPath)
@@ -25,7 +25,7 @@ class EpubWriter {
       ..write('"')
       ..write(
           ' media-type="application/oebps-package+xml"/></rootfiles></container>');
-    final String _container_file = buffer.toString();
+    final _container_file = buffer.toString();
 
     // Add simple metadata
     arch.addFile(ArchiveFile.noCompress(
