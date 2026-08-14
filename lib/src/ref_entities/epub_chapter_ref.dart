@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:quiver/collection.dart' as collections;
 import 'package:quiver/core.dart';
 
+import '../entities/epub_nav_section.dart';
 import 'epub_text_content_file_ref.dart';
 
 class EpubChapterRef {
@@ -12,6 +13,12 @@ class EpubChapterRef {
   String? ContentFileName;
   String? Anchor;
   List<EpubChapterRef>? SubChapters;
+
+  /// Navigation fragments that point inside this document, if any.
+  ///
+  /// Two or more of them mean the document holds several chapters, and it is
+  /// split on those fragments when the book is read.
+  List<EpubNavSection> NavSections = const <EpubNavSection>[];
 
   EpubChapterRef(EpubTextContentFileRef? epubTextContentFileRef) {
     this.epubTextContentFileRef = epubTextContentFileRef;

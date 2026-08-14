@@ -11,6 +11,7 @@ import 'entities/epub_byte_content_file.dart';
 import 'entities/epub_chapter.dart';
 import 'entities/epub_content.dart';
 import 'entities/epub_content_file.dart';
+import 'entities/epub_nav_section.dart';
 import 'entities/epub_text_content_file.dart';
 import 'readers/content_reader.dart';
 import 'readers/schema_reader.dart';
@@ -170,39 +171,130 @@ class EpubReader {
     return result;
   }
 
+  /// Reads every spine document into chapters.
+  ///
+  /// A document that the navigation addresses with two or more fragments holds
+  /// several chapters (Project Gutenberg packs a whole book into a handful of
+  /// documents), so it is split into one chapter per fragment. Every other
+  /// document stays a single chapter, as the spine describes it.
   static Future<List<EpubChapter>> readChapters(
       List<EpubChapterRef> chapterRefs) async {
     var result = <EpubChapter>[];
-    await Future.forEach(chapterRefs, (EpubChapterRef chapterRef) async {
+    for (var chapterRef in chapterRefs) {
+      var htmlContent = await chapterRef.readHtmlContent();
+      var doc = parse(htmlContent);
+      var documentTitle = _documentTitle(doc);
+      var sections = _resolveNavSections(doc, chapterRef.NavSections);
+
+      if (sections.length < 2) {
+        var chapter = EpubChapter();
+        chapter.ContentFileName = chapterRef.ContentFileName;
+        chapter.Anchor = chapterRef.Anchor;
+        chapter.HtmlContent = htmlContent;
+        chapter.Title = documentTitle ?? chapterRef.Title;
+        chapter.Paragraphs = parseParagraphsFromDoc(doc);
+        chapter.SubChapters = <EpubChapter>[];
+        result.add(chapter);
+        continue;
+      }
+
+      result.addAll(
+          _splitChapterByAnchors(chapterRef, doc, documentTitle, sections));
+    }
+    return result;
+  }
+
+  static String? _documentTitle(dom.Document doc) {
+    for (var node in doc.head?.children ?? <dom.Element>[]) {
+      if (node.localName == 'title') return node.text;
+    }
+    return null;
+  }
+
+  /// Navigation fragments that resolve to a top-level element of [doc]'s body,
+  /// ordered by their position in the document and one per position.
+  static List<_ResolvedNavSection> _resolveNavSections(
+      dom.Document doc, List<EpubNavSection> navSections) {
+    if (navSections.isEmpty) return const <_ResolvedNavSection>[];
+    var body = doc.body;
+    if (body == null) return const <_ResolvedNavSection>[];
+
+    var indexById = _topLevelIndexById(body.children);
+    var resolved = <_ResolvedNavSection>[];
+    var seenAnchors = <String>{};
+    for (var section in navSections) {
+      if (!seenAnchors.add(section.anchor)) continue;
+      var index = indexById[section.anchor];
+      if (index == null) continue;
+      resolved.add(_ResolvedNavSection(index, section.anchor, section.label));
+    }
+    resolved.sort((a, b) => a.startIndex.compareTo(b.startIndex));
+
+    // Several fragments can land on the same top-level element; the first one
+    // wins so that a chapter is never given an empty slice.
+    var unique = <_ResolvedNavSection>[];
+    for (var section in resolved) {
+      if (unique.isNotEmpty && unique.last.startIndex == section.startIndex) {
+        continue;
+      }
+      unique.add(section);
+    }
+    return unique;
+  }
+
+  /// Maps every id in the document body to the top-level element holding it.
+  static Map<String, int> _topLevelIndexById(List<dom.Element> children) {
+    var result = <String, int>{};
+    for (var index = 0; index < children.length; index++) {
+      _collectIds(children[index], index, result);
+    }
+    return result;
+  }
+
+  static void _collectIds(
+      dom.Element element, int index, Map<String, int> sink) {
+    var id = element.id;
+    if (id.isNotEmpty) sink.putIfAbsent(id, () => index);
+    for (var child in element.children) {
+      _collectIds(child, index, sink);
+    }
+  }
+
+  static List<EpubChapter> _splitChapterByAnchors(
+      EpubChapterRef chapterRef,
+      dom.Document doc,
+      String? documentTitle,
+      List<_ResolvedNavSection> sections) {
+    var children = doc.body!.children;
+    var headHtml = doc.head?.innerHtml ?? '';
+    var result = <EpubChapter>[];
+
+    void addSlice(int start, int end, String? anchor, String? title) {
+      var slice = children.sublist(start, end);
+      var paragraphs = _removeAllDiv(slice);
+      if (paragraphs.isEmpty) return;
       var chapter = EpubChapter();
       chapter.ContentFileName = chapterRef.ContentFileName;
-      chapter.Anchor = chapterRef.Anchor;
-      chapter.HtmlContent = await chapterRef.readHtmlContent();
-
-      var doc = chapter.HtmlContent == null ? dom.Document() : parse(chapter.HtmlContent);
-      chapter.Title = chapterRef.Title;
-      for (var node in doc.head?.children ?? []) {
-        if (node != null && node.localName == 'title') {
-          print('TITLE: ' + node.localName);
-          chapter.Title = node.text;
-          break;
-        }
-      }
-      chapter.Paragraphs = parseParagraphsFromDoc(doc);
-      print('New EPUB_PARSER:  ${chapterRef.SubChapters!.length} for chap: ' +
-          chapterRef.ContentFileName!);
-      print('PARA LENGTH start:  ${chapter.Paragraphs.length} for chap: ' +
-          chapterRef.ContentFileName!);
-      // chapter.SubChapters = await readChapters(chapterRef.SubChapters!);
-      // chapter.SubChapters?.forEach((subChapter) {
-      //   chapter.Paragraphs.addAll(subChapter.Paragraphs);
-      // });
-      // await appendParagraphs(chapter);
-      print('PARA LENGTH end :  ${chapter.Paragraphs.length} for chap: ' +
-          chapterRef.ContentFileName!);
-
+      chapter.Anchor = anchor;
+      chapter.Title = title;
+      chapter.HtmlContent = '<html><head>$headHtml</head><body>'
+          '${slice.map((element) => element.outerHtml).join()}'
+          '</body></html>';
+      chapter.Paragraphs = paragraphs;
+      chapter.SubChapters = <EpubChapter>[];
       result.add(chapter);
-    });
+    }
+
+    // Content ahead of the first fragment (cover art, publisher boilerplate)
+    // stays a chapter of its own; it is dropped when there is none.
+    addSlice(0, sections.first.startIndex, null, documentTitle);
+    for (var index = 0; index < sections.length; index++) {
+      var section = sections[index];
+      var end = index + 1 < sections.length
+          ? sections[index + 1].startIndex
+          : children.length;
+      addSlice(section.startIndex, end, section.anchor, section.label);
+    }
     return result;
   }
 
@@ -248,12 +340,23 @@ class EpubReader {
     });
   }
 
+  /// Maps a navigation target onto the chapter that holds it.
+  ///
+  /// Documents split on fragments contribute one `file.xhtml#anchor` key per
+  /// chapter; the plain file name always resolves to the first chapter read
+  /// from that document.
   static Map<String, int>? mapPagesToChapter(List<EpubChapter>? chapters) {
     if (chapters == null) return null;
     var map = <String, int>{};
     for (var i = 0; i < chapters.length; i++) {
       var epubChapter = chapters[i];
-      map[epubChapter.ContentFileName!] = i;
+      var fileName = epubChapter.ContentFileName;
+      if (fileName == null) continue;
+      map.putIfAbsent(fileName, () => i);
+      var anchor = epubChapter.Anchor;
+      if (anchor != null && anchor.isNotEmpty) {
+        map['$fileName#$anchor'] = i;
+      }
     }
     return map;
   }
@@ -270,25 +373,38 @@ class EpubReader {
     var result = <ToCItem>[];
     if (points == null) return result;
 
+    var pageToChapter = book.PageToChapterMap ?? const <String, int>{};
     points.forEach((point) {
-      if (point.NavigationLabels == null) {
-      } else {
-        point.NavigationLabels?.forEach((label) {
+      var source = point.Content?.Source;
+      var label = point.NavigationLabels?.isNotEmpty == true
+          ? point.NavigationLabels!.first.Text
+          : null;
+      if (source != null && label != null) {
+        var target = Uri.decodeFull(source);
+        // A fragment resolves to its own chapter once the document holding it
+        // has been split; otherwise the whole document is the target.
+        var chapterIndex =
+            pageToChapter[target] ?? pageToChapter[target.split('#')[0]];
+        if (chapterIndex != null) {
           var item = ToCItem();
-          if (book.PageToChapterMap!.containsKey(point.Content!.Source!.split('#')[0])) {
-            item.chapterIndex =
-            book.PageToChapterMap![point.Content!.Source!.split('#')[0]]!;
-            item.label = prefix + label.Text!;
-            result.add(item);
-          }
-
-
-          var items =
-              traverseNavMap(book, point.ChildNavigationPoints, prefix + '  ');
-          result.addAll(items as Iterable<ToCItem>);
-        });
+          item.chapterIndex = chapterIndex;
+          item.label = prefix + label;
+          result.add(item);
+        }
       }
+      result.addAll(
+          traverseNavMap(book, point.ChildNavigationPoints, prefix + '  '));
     });
     return result;
   }
+}
+
+/// A navigation fragment located inside a parsed document.
+class _ResolvedNavSection {
+  const _ResolvedNavSection(this.startIndex, this.anchor, this.label);
+
+  /// Index of the top-level body element the fragment points at.
+  final int startIndex;
+  final String anchor;
+  final String label;
 }

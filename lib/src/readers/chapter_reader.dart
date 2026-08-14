@@ -1,6 +1,6 @@
+import '../entities/epub_nav_section.dart';
 import '../ref_entities/epub_book_ref.dart';
 import '../ref_entities/epub_chapter_ref.dart';
-import '../ref_entities/epub_text_content_file_ref.dart';
 import '../schema/navigation/epub_navigation_point.dart';
 import '../schema/opf/epub_spine_item_ref.dart';
 
@@ -14,79 +14,66 @@ class ChapterReader {
         bookRef, bookRef.Schema!.Package!.Spine!.Items!);
   }
 
-  static List<EpubChapterRef> getChaptersImpl(
-      EpubBookRef bookRef, List<EpubNavigationPoint> navigationPoints) {
-    var result = <EpubChapterRef>[];
-    for (var key in bookRef.Content!.Html!.keys) {
-      print('[EPUB V3 DEBUG]' + key);
-    }
-    navigationPoints.forEach((EpubNavigationPoint navigationPoint) {
-      String? contentFileName;
-      String? anchor;
-      var contentSourceAnchorCharIndex =
-          navigationPoint.Content!.Source!.indexOf('#');
-      if (contentSourceAnchorCharIndex == -1) {
-        contentFileName = navigationPoint.Content!.Source;
-        anchor = null;
-      } else {
-        contentFileName = navigationPoint.Content!.Source!
-            .substring(0, contentSourceAnchorCharIndex);
-        anchor = navigationPoint.Content!.Source!
-            .substring(contentSourceAnchorCharIndex + 1);
-      }
-      contentFileName = Uri.decodeFull(contentFileName!);
-      EpubTextContentFileRef? htmlContentFileRef;
-
-      //print all bookRef.Content!.Html! keys
-      print('[EPUB V3 DEBUG] $contentFileName');
-
-      // for (var key in bookRef.Content!.Html!.keys) {
-        if (bookRef.Content!.Html!.containsKey(contentFileName)) {
-          // contentFileName = key;
-          htmlContentFileRef = bookRef.Content!.Html![contentFileName];
-          var chapterRef = EpubChapterRef(htmlContentFileRef);
-          chapterRef.ContentFileName = contentFileName;
-          chapterRef.Anchor = anchor;
-          chapterRef.Title = navigationPoint.NavigationLabels!.first.Text;
-          chapterRef.SubChapters =
-              getChaptersImpl(bookRef, navigationPoint.ChildNavigationPoints!);
-
-          result.add(chapterRef);
-          result.addAll(chapterRef.SubChapters as Iterable<EpubChapterRef>);
-        //   break;
-        // }
-      }
-    });
-    return result;
-  }
-
+  /// One chapter reference per spine item, in reading order.
+  ///
+  /// Each reference also carries the navigation fragments that point inside its
+  /// document ([EpubChapterRef.NavSections]) so the reader can split a
+  /// multi-chapter document into one chapter per navigation entry.
   static List<EpubChapterRef> getChaptersImplBySpine(
-      EpubBookRef bookRef, List<EpubSpineItemRef> spineItemRef) {
+      EpubBookRef bookRef, List<EpubSpineItemRef> spineItemRefs) {
+    var navSections =
+        _navSectionsByFile(bookRef.Schema!.Navigation!.NavMap?.Points);
     var result = <EpubChapterRef>[];
-    spineItemRef.forEach((EpubSpineItemRef spineItemRef) {
-      String? contentFileName;
-      String? anchor;
-      var manifestItem = bookRef.Schema!.Package!.Manifest!.Items!.where((item) => spineItemRef.IdRef == item.Id).first;
-
-      contentFileName = Uri.decodeFull(manifestItem.Href!);
-      EpubTextContentFileRef? htmlContentFileRef;
+    for (var spineItemRef in spineItemRefs) {
+      var manifestItem = bookRef.Schema!.Package!.Manifest!.Items!
+          .where((item) => spineItemRef.IdRef == item.Id)
+          .first;
+      var contentFileName = Uri.decodeFull(manifestItem.Href!);
       if (!bookRef.Content!.Html!.containsKey(contentFileName)) {
         throw Exception(
             'Incorrect EPUB manifest: item with href = "$contentFileName" is missing.');
       }
 
-      htmlContentFileRef = bookRef.Content!.Html![contentFileName];
-      var chapterRef = EpubChapterRef(htmlContentFileRef);
+      var chapterRef = EpubChapterRef(bookRef.Content!.Html![contentFileName]);
       chapterRef.ContentFileName = contentFileName;
-      chapterRef.Anchor = anchor;
-      chapterRef.Title = 'chap title';
-      chapterRef.SubChapters = [];
-      // chapterRef.Title = spineItemRef.NavigationLabels!.first.Text;
-      // chapterRef.SubChapters =
-      //     getChaptersImpl(bookRef, spineItemRef.ChildNavigationPoints!);
-
+      chapterRef.Anchor = null;
+      chapterRef.Title = null;
+      chapterRef.SubChapters = <EpubChapterRef>[];
+      chapterRef.NavSections =
+          navSections[contentFileName] ?? const <EpubNavSection>[];
       result.add(chapterRef);
-    });
+    }
     return result;
+  }
+
+  /// Navigation fragments grouped by the document they point into.
+  static Map<String, List<EpubNavSection>> _navSectionsByFile(
+      List<EpubNavigationPoint>? points) {
+    var result = <String, List<EpubNavSection>>{};
+    _collectNavSections(points, result);
+    return result;
+  }
+
+  static void _collectNavSections(List<EpubNavigationPoint>? points,
+      Map<String, List<EpubNavSection>> sink) {
+    if (points == null) return;
+    for (var point in points) {
+      var source = point.Content?.Source;
+      var labels = point.NavigationLabels;
+      if (source != null && labels != null && labels.isNotEmpty) {
+        var label = labels.first.Text;
+        var anchorCharIndex = source.indexOf('#');
+        if (label != null && anchorCharIndex >= 0) {
+          var fileName = Uri.decodeFull(source.substring(0, anchorCharIndex));
+          var anchor = source.substring(anchorCharIndex + 1);
+          if (anchor.isNotEmpty) {
+            sink
+                .putIfAbsent(fileName, () => <EpubNavSection>[])
+                .add(EpubNavSection(anchor: anchor, label: label));
+          }
+        }
+      }
+      _collectNavSections(point.ChildNavigationPoints, sink);
+    }
   }
 }
