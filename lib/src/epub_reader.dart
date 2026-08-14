@@ -191,7 +191,7 @@ class EpubReader {
         chapter.ContentFileName = chapterRef.ContentFileName;
         chapter.Anchor = chapterRef.Anchor;
         chapter.HtmlContent = htmlContent;
-        chapter.Title = documentTitle ?? chapterRef.Title;
+        chapter.Title = _singleChapterTitle(chapterRef, documentTitle);
         chapter.Paragraphs = parseParagraphsFromDoc(doc);
         chapter.SubChapters = <EpubChapter>[];
         result.add(chapter);
@@ -202,6 +202,19 @@ class EpubReader {
           _splitChapterByAnchors(chapterRef, doc, documentTitle, sections));
     }
     return result;
+  }
+
+  /// The name of a document that is a chapter on its own.
+  ///
+  /// A document `<title>` names the whole book and repeats across every
+  /// document of a Gutenberg export, so it can never name one chapter. When the
+  /// navigation names this document exactly once, that label is the chapter's
+  /// name; only an unaddressed document falls back to its `<title>`.
+  static String? _singleChapterTitle(
+      EpubChapterRef chapterRef, String? documentTitle) {
+    var navSections = chapterRef.NavSections;
+    if (navSections.length == 1) return navSections.single.label;
+    return documentTitle ?? chapterRef.Title;
   }
 
   static String? _documentTitle(dom.Document doc) {
