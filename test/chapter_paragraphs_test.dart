@@ -202,4 +202,29 @@ void main() {
       );
     });
   });
+
+  group('a table with illustrations', () {
+    test('keeps an image-only cell and the images of a mixed row', () {
+      const source = '<body><table>'
+          '<tr><td><img src="plate.png" alt=""/></td></tr>'
+          '<tr><td>Figure 2</td><td><a href="x"><img src="fig2.png"/></a>'
+          '</td><td>Notes</td></tr></table><p>After.</p></body>';
+      final paragraphs = EpubReader.parseParagraphs(source);
+
+      expect(paragraphs.map((element) => element.outerHtml), [
+        '<p><img src="plate.png" alt=""></p>',
+        '<p>Figure 2<img src="fig2.png">, Notes</p>',
+        '<p>After.</p>',
+      ]);
+      expect(paragraphs.map(text), ['', 'Figure 2, Notes', 'After.']);
+
+      final again = EpubReader.parseParagraphs(
+        '<body>${paragraphs.map((element) => element.outerHtml).join()}</body>',
+      );
+      expect(
+        again.map((element) => element.outerHtml),
+        paragraphs.map((element) => element.outerHtml),
+      );
+    });
+  });
 }

@@ -19,8 +19,9 @@ import 'package:html/dom.dart' as dom;
 /// already one paragraph and is returned as itself.
 ///
 /// A table is read row by row: its caption, then one paragraph per row with
-/// the row's cells - header cells included - joined by ", ". A table nested in
-/// a cell follows the row that holds it. A row is the unit a listener can
+/// the row's cells - header cells included - joined by ", ", each cell's
+/// illustrations kept after its text. A table nested in a cell follows the row
+/// that holds it. A row is the unit a listener can
 /// follow; the whole table as one paragraph is a wall of cell text.
 ///
 /// An inline element that holds blocks - a link or a `<span>` around whole
@@ -247,7 +248,7 @@ void _collectTable(dom.Element table, List<dom.Element> sink) {
   for (final part in table.children) {
     final tag = part.localName;
     if (tag == 'caption') {
-      _addTextParagraph(_readingText(part, <dom.Element>[]), sink);
+      _addRowParagraph([_readCell(part, <dom.Element>[])], sink);
     } else if (tag == 'thead' || tag == 'tbody' || tag == 'tfoot') {
       for (final row in part.children) {
         if (row.localName == 'tr') _collectRow(row, sink);
@@ -259,28 +260,60 @@ void _collectTable(dom.Element table, List<dom.Element> sink) {
 }
 
 void _collectRow(dom.Element row, List<dom.Element> sink) {
-  final cells = <String>[];
+  final cells = <_Cell>[];
   final nestedTables = <dom.Element>[];
   for (final cell in row.children) {
     if (cell.localName != 'td' && cell.localName != 'th') continue;
-    final text = _readingText(cell, nestedTables);
-    if (text.isNotEmpty) cells.add(text);
+    cells.add(_readCell(cell, nestedTables));
   }
-  _addTextParagraph(cells.join(', '), sink);
+  _addRowParagraph(cells, sink);
   for (final nested in nestedTables) {
     _collectTable(nested, sink);
   }
 }
 
-void _addTextParagraph(String text, List<dom.Element> sink) {
-  if (text.isEmpty) return;
-  sink.add(dom.Element.tag('p')..text = text);
+/// One paragraph for a row: each cell's text, joined by ", ", with the cell's
+/// illustrations after its text. A row with neither is not a paragraph.
+void _addRowParagraph(List<_Cell> cells, List<dom.Element> sink) {
+  final paragraph = dom.Element.tag('p');
+  var hasText = false;
+  var hasContent = false;
+  for (final cell in cells) {
+    if (cell.text.isNotEmpty) {
+      paragraph.append(dom.Text(hasText ? ', ${cell.text}' : cell.text));
+      hasText = true;
+      hasContent = true;
+    }
+    for (final media in cell.media) {
+      paragraph.append(media.clone(true));
+      hasContent = true;
+    }
+  }
+  if (hasContent) sink.add(paragraph);
+}
+
+class _Cell {
+  _Cell(this.text, this.media);
+
+  final String text;
+  final List<dom.Element> media;
+}
+
+_Cell _readCell(dom.Element cell, List<dom.Element> nestedTables) {
+  final media = <dom.Element>[];
+  final text = _readingText(cell, nestedTables, media);
+  return _Cell(text, media);
 }
 
 /// The text of [element] with every break - a `<br>`, a block boundary - read
 /// as a space. Tables inside it are not part of it; they are added to
-/// [nestedTables] to be read as tables of their own.
-String _readingText(dom.Element element, List<dom.Element> nestedTables) {
+/// [nestedTables] to be read as tables of their own. Its illustrations are
+/// added to [media].
+String _readingText(
+  dom.Element element,
+  List<dom.Element> nestedTables,
+  List<dom.Element> media,
+) {
   final buffer = StringBuffer();
   void write(dom.Node node) {
     if (node is dom.Text) {
@@ -292,6 +325,10 @@ String _readingText(dom.Element element, List<dom.Element> nestedTables) {
     if (_nonReadingTags.contains(tag)) return;
     if (tag == 'table') {
       nestedTables.add(node);
+      return;
+    }
+    if (_mediaTags.contains(tag)) {
+      media.add(node);
       return;
     }
     if (tag == 'br') {
