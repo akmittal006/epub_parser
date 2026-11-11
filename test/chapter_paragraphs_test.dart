@@ -95,4 +95,63 @@ void main() {
     EpubReader.parseParagraphsFromDoc(document);
     expect(document.querySelector('script'), isNotNull);
   });
+
+  group('an inline element around blocks', () {
+    List<String> roundTrip(String source) {
+      final first = EpubReader.parseParagraphs(source);
+      final again = EpubReader.parseParagraphs(
+        '<body>${first.map((element) => element.outerHtml).join()}</body>',
+      );
+      expect(
+        again.map((element) => element.outerHtml),
+        first.map((element) => element.outerHtml),
+        reason: 'stored paragraphs must read back into themselves',
+      );
+      return first.map((element) => element.outerHtml).toList();
+    }
+
+    test('a link around divs carries into each paragraph', () {
+      expect(
+        roundTrip('<body><a href="next.xhtml"><div>Alpha.</div>'
+            '<div>Beta.</div></a><p>After.</p></body>'),
+        [
+          '<div><a href="next.xhtml">Alpha.</a></div>',
+          '<div><a href="next.xhtml">Beta.</a></div>',
+          '<p>After.</p>',
+        ],
+      );
+    });
+
+    test('a span around paragraphs carries into each paragraph', () {
+      expect(
+        roundTrip('<body><span class="x"><p>Alpha.</p><p>Beta.</p></span>'
+            '</body>'),
+        [
+          '<p><span class="x">Alpha.</span></p>',
+          '<p><span class="x">Beta.</span></p>',
+        ],
+      );
+    });
+
+    test('text around the blocks keeps the wrapper too', () {
+      expect(
+        roundTrip('<body><div>Before <em id="e">lead <div>Middle.</div> tail'
+            '</em> after.</div></body>'),
+        [
+          '<p>Before </p>',
+          '<p><em>lead </em></p>',
+          '<div><em>Middle.</em></div>',
+          '<p><em> tail</em></p>',
+          '<p> after.</p>',
+        ],
+      );
+    });
+
+    test('a block with structure of its own keeps it', () {
+      expect(
+        roundTrip('<body><a href="x"><ul><li>One</li></ul></a></body>'),
+        ['<ul><li>One</li></ul>'],
+      );
+    });
+  });
 }

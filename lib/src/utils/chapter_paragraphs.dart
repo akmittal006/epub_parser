@@ -18,6 +18,13 @@ import 'package:html/dom.dart' as dom;
 /// A container that holds a single run - no `<br>` and no block child - is
 /// already one paragraph and is returned as itself.
 ///
+/// An inline element that holds blocks - a link or a `<span>` around whole
+/// paragraphs - is walked like a container, and its markup is carried into
+/// every paragraph made inside it: `<a href><div>Alpha.</div></a>` becomes
+/// `<div><a href>Alpha.</a></div>`. Wrapping it as inline content would nest a
+/// block inside a `<p>`, which no HTML parser keeps, so the stored chapter
+/// would read back as different paragraphs from the ones it was stored as.
+///
 /// Elements that are never read - `<script>`, `<style>`, `<template>`,
 /// `<noscript>` - contribute nothing, wherever they sit: their source text is
 /// not reader text, and it is not something to speak. A paragraph that holds
@@ -28,7 +35,7 @@ import 'package:html/dom.dart' as dom;
 /// re-read into exactly the paragraphs it was stored as.
 List<dom.Element> chapterParagraphs(Iterable<dom.Node> nodes) {
   final paragraphs = <dom.Element>[];
-  _collect(nodes, paragraphs);
+  _collect(nodes, paragraphs, const []);
   return paragraphs;
 }
 
@@ -85,17 +92,25 @@ const Set<String> _mediaTags = {
 
 final String _mediaSelector = _mediaTags.join(',');
 
+final String _blockSelector = {..._containerTags, ..._blockTags}.join(',');
+
 /// Elements whose content is not part of the text.
 const Set<String> _nonReadingTags = {'noscript', 'script', 'style', 'template'};
 
 final String _nonReadingSelector = _nonReadingTags.join(',');
 
-void _collect(Iterable<dom.Node> nodes, List<dom.Element> sink) {
+/// [wrappers] are the inline elements, outermost first, that the walk is
+/// inside of; every paragraph made here carries a copy of them.
+void _collect(
+  Iterable<dom.Node> nodes,
+  List<dom.Element> sink,
+  List<dom.Element> wrappers,
+) {
   var run = <dom.Node>[];
 
   void closeRun() {
     if (run.isNotEmpty) {
-      final paragraph = _runParagraph(run);
+      final paragraph = _runParagraph(run, wrappers);
       if (_carriesContent(paragraph.nodes)) sink.add(paragraph);
     }
     run = <dom.Node>[];
@@ -115,14 +130,17 @@ void _collect(Iterable<dom.Node> nodes, List<dom.Element> sink) {
     } else if (_containerTags.contains(tag)) {
       closeRun();
       if (!_isSingleRun(node)) {
-        _collect(node.nodes, sink);
+        _collect(node.nodes, sink, wrappers);
       } else {
-        final paragraph = _readable(node);
+        final paragraph = _wrapped(_readable(node), wrappers);
         if (_carriesContent(paragraph.nodes)) sink.add(paragraph);
       }
     } else if (_blockTags.contains(tag)) {
       closeRun();
-      sink.add(_readable(node));
+      sink.add(_wrapped(_readable(node), wrappers));
+    } else if (_holdsBlocks(node)) {
+      closeRun();
+      _collect(node.nodes, sink, [...wrappers, node]);
     } else {
       run.add(node);
     }
@@ -135,7 +153,8 @@ bool _isSingleRun(dom.Element container) {
     final tag = child.localName;
     if (tag == 'br' ||
         _containerTags.contains(tag) ||
-        _blockTags.contains(tag)) {
+        _blockTags.contains(tag) ||
+        _holdsBlocks(child)) {
       return false;
     }
   }
@@ -157,13 +176,49 @@ bool _carriesContent(Iterable<dom.Node> nodes) {
 
 /// A run becomes a `<p>` of its own. The nodes are copied, not moved: the
 /// document they came from still serialises the chapter's own HTML.
-dom.Element _runParagraph(List<dom.Node> run) {
+dom.Element _runParagraph(List<dom.Node> run, List<dom.Element> wrappers) {
   final paragraph = dom.Element.tag('p');
+  final target = _appendWrappers(paragraph, wrappers);
   for (final node in run) {
-    paragraph.append(node.clone(true));
+    target.append(node.clone(true));
   }
   _removeNonReading(paragraph);
   return paragraph;
+}
+
+bool _holdsBlocks(dom.Element element) =>
+    element.querySelector(_blockSelector) != null;
+
+/// [block] with the inline [wrappers] moved inside it, around its content.
+///
+/// Only a block whose content is inline can take them; one that holds blocks
+/// of its own, or a table, keeps its structure and goes without.
+dom.Element _wrapped(dom.Element block, List<dom.Element> wrappers) {
+  if (wrappers.isEmpty ||
+      block.nodes.isEmpty ||
+      block.localName == 'table' ||
+      _holdsBlocks(block)) {
+    return block;
+  }
+  final copy = block.clone(false);
+  final target = _appendWrappers(copy, wrappers);
+  for (final node in block.nodes) {
+    target.append(node.clone(true));
+  }
+  return copy;
+}
+
+/// Appends a copy of each wrapper inside the previous one and returns the
+/// innermost. The copies drop `id`: an id names one element, and the wrapper is
+/// now repeated.
+dom.Element _appendWrappers(dom.Element parent, List<dom.Element> wrappers) {
+  var target = parent;
+  for (final wrapper in wrappers) {
+    final copy = wrapper.clone(false)..attributes.remove('id');
+    target.append(copy);
+    target = copy;
+  }
+  return target;
 }
 
 /// [element] itself when it holds nothing unread, otherwise a copy without it.
