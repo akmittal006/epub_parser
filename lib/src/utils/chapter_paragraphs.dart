@@ -18,6 +18,11 @@ import 'package:html/dom.dart' as dom;
 /// A container that holds a single run - no `<br>` and no block child - is
 /// already one paragraph and is returned as itself.
 ///
+/// Elements that are never read - `<script>`, `<style>`, `<template>`,
+/// `<noscript>` - contribute nothing, wherever they sit: their source text is
+/// not reader text, and it is not something to speak. A paragraph that holds
+/// one is returned as a copy without it; the document is never modified.
+///
 /// The result is a fixed point: the paragraphs re-serialised and run through
 /// this again come back the same, which is what lets a stored chapter be
 /// re-read into exactly the paragraphs it was stored as.
@@ -80,11 +85,19 @@ const Set<String> _mediaTags = {
 
 final String _mediaSelector = _mediaTags.join(',');
 
+/// Elements whose content is not part of the text.
+const Set<String> _nonReadingTags = {'noscript', 'script', 'style', 'template'};
+
+final String _nonReadingSelector = _nonReadingTags.join(',');
+
 void _collect(Iterable<dom.Node> nodes, List<dom.Element> sink) {
   var run = <dom.Node>[];
 
   void closeRun() {
-    if (_carriesContent(run)) sink.add(_runParagraph(run));
+    if (run.isNotEmpty) {
+      final paragraph = _runParagraph(run);
+      if (_carriesContent(paragraph.nodes)) sink.add(paragraph);
+    }
     run = <dom.Node>[];
   }
 
@@ -95,18 +108,21 @@ void _collect(Iterable<dom.Node> nodes, List<dom.Element> sink) {
     }
     if (node is! dom.Element) continue;
     final tag = node.localName;
-    if (tag == 'br') {
+    if (_nonReadingTags.contains(tag)) {
+      continue;
+    } else if (tag == 'br') {
       closeRun();
     } else if (_containerTags.contains(tag)) {
       closeRun();
       if (!_isSingleRun(node)) {
         _collect(node.nodes, sink);
-      } else if (_carriesContent(node.nodes)) {
-        sink.add(node);
+      } else {
+        final paragraph = _readable(node);
+        if (_carriesContent(paragraph.nodes)) sink.add(paragraph);
       }
     } else if (_blockTags.contains(tag)) {
       closeRun();
-      sink.add(node);
+      sink.add(_readable(node));
     } else {
       run.add(node);
     }
@@ -146,5 +162,20 @@ dom.Element _runParagraph(List<dom.Node> run) {
   for (final node in run) {
     paragraph.append(node.clone(true));
   }
+  _removeNonReading(paragraph);
   return paragraph;
+}
+
+/// [element] itself when it holds nothing unread, otherwise a copy without it.
+dom.Element _readable(dom.Element element) {
+  if (element.querySelector(_nonReadingSelector) == null) return element;
+  final copy = element.clone(true);
+  _removeNonReading(copy);
+  return copy;
+}
+
+void _removeNonReading(dom.Element element) {
+  for (final unread in element.querySelectorAll(_nonReadingSelector)) {
+    unread.remove();
+  }
 }

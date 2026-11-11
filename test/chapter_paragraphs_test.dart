@@ -1,4 +1,5 @@
 import 'package:am_epub_parser/am_epub_parser.dart';
+import 'package:html/parser.dart' show parse;
 import 'package:test/test.dart';
 
 /// Project Gutenberg's "O Primo Bazilio" (ebook 42942) writes its body as bare
@@ -58,5 +59,40 @@ void main() {
       again.map((element) => element.outerHtml),
       first.map((element) => element.outerHtml),
     );
+  });
+
+  test('script, style, template and noscript are never reader text', () {
+    const source = '<body><h2>Chapter</h2>'
+        '<script>var telemetry = 42;</script>'
+        '<style>.note { display:none }</style>'
+        '<p>Story<script>track();</script> goes on.</p>'
+        '<div>Bare <noscript>Enable JS</noscript>text.<br/>'
+        '<template><p>Hidden</p></template>More.</div></body>';
+    final paragraphs = EpubReader.parseParagraphs(source);
+
+    expect(paragraphs.map(text), [
+      'Chapter',
+      'Story goes on.',
+      'Bare text.',
+      'More.',
+    ]);
+    for (final paragraph in paragraphs) {
+      expect(paragraph.querySelector('script,style,template,noscript'), isNull);
+    }
+
+    final again = EpubReader.parseParagraphs(
+      '<body>${paragraphs.map((element) => element.outerHtml).join()}</body>',
+    );
+    expect(
+      again.map((element) => element.outerHtml),
+      paragraphs.map((element) => element.outerHtml),
+    );
+  });
+
+  test('a chapter document keeps its own scripts in its HTML', () {
+    final document =
+        parse('<body><p>Story<script>track();</script></p></body>');
+    EpubReader.parseParagraphsFromDoc(document);
+    expect(document.querySelector('script'), isNotNull);
   });
 }
