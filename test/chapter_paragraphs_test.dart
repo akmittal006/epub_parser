@@ -154,4 +154,52 @@ void main() {
       );
     });
   });
+
+  group('a table', () {
+    test('is read row by row, with headers and caption', () {
+      final paragraphs = EpubReader.parseParagraphs(
+        '<body><table><caption>Prices</caption>'
+        '<thead><tr><th>Item</th><th>Cost</th></tr></thead>'
+        '<tbody><tr><td>Bread</td><td><em>2</em></td></tr>'
+        '<tr><td>Milk</td><td></td></tr></tbody></table>'
+        '<p>After.</p></body>',
+      );
+      expect(paragraphs.map(text), [
+        'Prices',
+        'Item, Cost',
+        'Bread, 2',
+        'Milk',
+        'After.',
+      ]);
+    });
+
+    test('nested in a cell follows the row that holds it', () {
+      final paragraphs = EpubReader.parseParagraphs(
+        '<body><table><tr><td>Outer</td><td>Cell'
+        '<table><tr><td>Inner one</td></tr><tr><td>Inner two</td></tr>'
+        '</table></td></tr><tr><td>Last row</td></tr></table></body>',
+      );
+      expect(paragraphs.map(text), [
+        'Outer, Cell',
+        'Inner one',
+        'Inner two',
+        'Last row',
+      ]);
+    });
+
+    test('reads back into the same rows', () {
+      final first = EpubReader.parseParagraphs(
+        '<body><table><tr><td>Alpha.</td></tr><tr><td>Beta.</td></tr>'
+        '</table><p>After.</p></body>',
+      );
+      final again = EpubReader.parseParagraphs(
+        '<body>${first.map((element) => element.outerHtml).join()}</body>',
+      );
+      expect(first.map(text), ['Alpha.', 'Beta.', 'After.']);
+      expect(
+        again.map((element) => element.outerHtml),
+        first.map((element) => element.outerHtml),
+      );
+    });
+  });
 }
