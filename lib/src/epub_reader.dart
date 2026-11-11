@@ -14,6 +14,7 @@ import 'entities/epub_content_file.dart';
 import 'entities/epub_nav_section.dart';
 import 'entities/epub_text_content_file.dart';
 import 'readers/content_reader.dart';
+import 'utils/chapter_paragraphs.dart';
 import 'readers/schema_reader.dart';
 import 'ref_entities/epub_book_ref.dart';
 import 'ref_entities/epub_byte_content_file_ref.dart';
@@ -232,7 +233,7 @@ class EpubReader {
     var body = doc.body;
     if (body == null) return const <_ResolvedNavSection>[];
 
-    var indexById = _topLevelIndexById(body.children);
+    var indexById = _topLevelIndexById(body.nodes);
     var resolved = <_ResolvedNavSection>[];
     var seenAnchors = <String>{};
     for (var section in navSections) {
@@ -255,11 +256,16 @@ class EpubReader {
     return unique;
   }
 
-  /// Maps every id in the document body to the top-level element holding it.
-  static Map<String, int> _topLevelIndexById(List<dom.Element> children) {
+  /// Maps every id in the document body to the index of the top-level node
+  /// holding it.
+  ///
+  /// Indices count every body node, text included, so that a slice keeps the
+  /// bare text that sits between top-level elements.
+  static Map<String, int> _topLevelIndexById(List<dom.Node> nodes) {
     var result = <String, int>{};
-    for (var index = 0; index < children.length; index++) {
-      _collectIds(children[index], index, result);
+    for (var index = 0; index < nodes.length; index++) {
+      var node = nodes[index];
+      if (node is dom.Element) _collectIds(node, index, result);
     }
     return result;
   }
@@ -278,21 +284,24 @@ class EpubReader {
       dom.Document doc,
       String? documentTitle,
       List<_ResolvedNavSection> sections) {
-    var children = doc.body!.children;
+    var children = doc.body!.nodes;
     var headHtml = doc.head?.innerHtml ?? '';
     var result = <EpubChapter>[];
 
     void addSlice(int start, int end, String? anchor, String? title) {
       var slice = children.sublist(start, end);
-      var paragraphs = _removeAllDiv(slice);
+      var paragraphs = chapterParagraphs(slice);
       if (paragraphs.isEmpty) return;
+      var sliceBody = dom.Element.tag('body');
+      for (var node in slice) {
+        sliceBody.append(node.clone(true));
+      }
       var chapter = EpubChapter();
       chapter.ContentFileName = chapterRef.ContentFileName;
       chapter.Anchor = anchor;
       chapter.Title = title;
-      chapter.HtmlContent = '<html><head>$headHtml</head><body>'
-          '${slice.map((element) => element.outerHtml).join()}'
-          '</body></html>';
+      chapter.HtmlContent = '<html><head>$headHtml</head>'
+          '${sliceBody.outerHtml}</html>';
       chapter.Paragraphs = paragraphs;
       chapter.SubChapters = <EpubChapter>[];
       result.add(chapter);
@@ -311,38 +320,16 @@ class EpubReader {
     return result;
   }
 
-  static List<dom.Element> _removeAllDiv(List<dom.Element> elements) {
-    final result = <dom.Element>[];
-
-    for (final node  in elements) {
-      // var node = rawNode as dom.Element;
-      if ((node.localName == 'div' || node.localName == 'section' || node.localName == 'article') &&
-          node.children.isNotEmpty) {
-        result.addAll(_removeAllDiv(node.children));
-      } else {
-        result.add(node);
-      }
-    }
-
-    return result;
-  }
-
+  /// The reader paragraphs of [doc]'s body; see [chapterParagraphs].
   static List<dom.Element> parseParagraphsFromDoc(dom.Document doc) {
-    if (doc.getElementsByTagName('body').isEmpty) return [];
-    try {
-      // var doc = parse(htmlContent);
-      return _removeAllDiv(doc.getElementsByTagName('body').first.children);
-    } on Exception catch (_) {}
-    return [];
+    var body = doc.body;
+    if (body == null) return [];
+    return chapterParagraphs(body.nodes);
   }
 
   static List<dom.Element> parseParagraphs(String? htmlContent) {
     if (htmlContent == null) return [];
-    try {
-      var doc = parse(htmlContent);
-      return _removeAllDiv(doc.getElementsByTagName('body').first.children);
-    } on Exception catch (_) {}
-    return [];
+    return parseParagraphsFromDoc(parse(htmlContent));
   }
 
   static Future<void> appendParagraphs(EpubChapter chapter) async {

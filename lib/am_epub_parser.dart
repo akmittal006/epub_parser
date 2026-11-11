@@ -3,6 +3,7 @@ library epub_parser;
 export 'src/utils/enum_from_string.dart';
 
 export 'src/epub_reader.dart';
+export 'src/utils/chapter_paragraphs.dart';
 export 'src/epub_writer.dart';
 export 'src/ref_entities/epub_book_ref.dart';
 export 'src/ref_entities/epub_chapter_ref.dart';
