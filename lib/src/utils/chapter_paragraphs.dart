@@ -289,6 +289,9 @@ void _addRowParagraph(List<_Cell> cells, List<dom.Element> sink) {
       hasContent = true;
     }
   }
+  // The illustrations are copied whole, so what is never read inside them -
+  // an SVG's <style> - is removed from the copies too.
+  _removeNonReading(paragraph);
   if (hasContent) sink.add(paragraph);
 }
 

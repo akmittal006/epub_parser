@@ -227,4 +227,22 @@ void main() {
       );
     });
   });
+
+  test('an illustration copied out of a table cell drops what is never read',
+      () {
+    const source = '<body><table><tr><td>'
+        '<svg><style>.label { fill: red }</style><text>Figure A</text></svg>'
+        '</td></tr></table></body>';
+    final first = EpubReader.parseParagraphs(source);
+    expect(first.single.querySelector('style'), isNull);
+    expect(text(first.single), 'Figure A');
+
+    final again = EpubReader.parseParagraphs(
+      '<body>${first.map((element) => element.outerHtml).join()}</body>',
+    );
+    expect(
+      again.map((element) => element.outerHtml),
+      first.map((element) => element.outerHtml),
+    );
+  });
 }
